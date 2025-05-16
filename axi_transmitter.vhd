@@ -48,7 +48,7 @@ signal right_audio_data, left_audio_data    : std_logic_vector(AC_DATA_WIDTH-1 d
 signal right_axis_data, left_axis_data      : std_logic_vector(AUDIO_DATA_WIDTH-1 downto 0) := (others => '0');
 
 type state_type is (IdleHigh, IdleLow, LatchInputs, SetRightValid, SetLeftValid);
-signal curr_state, next_state : state_type := IdleHigh;
+signal curr_state, next_state : state_type := IdleLow;
 
 ----------------------------------------------------------------------------
 
@@ -84,9 +84,11 @@ right_sync_int : double_ff_sync
 -- Processes
 ----------------------------------------------------------------------------
 
-axis_stream : process(LR_mux_set, right_axis_data, left_axis_data)
+axis_stream : process(LR_mux_set, right_axis_data, left_axis_data, m00_axis_aresetn)
 begin
-    if LR_mux_set = '0' then
+    if (m00_axis_aresetn = '0') then
+        m00_axis_tdata <= (others => '0');
+    elsif LR_mux_set = '0' then
         m00_axis_tdata <= right_axis_data;
     elsif LR_mux_set = '1' then
         m00_axis_tdata <= left_axis_data;
@@ -98,7 +100,10 @@ end process axis_stream;
 latch_audio_inputs : process(m00_axis_aclk)
 begin
     if rising_edge(m00_axis_aclk) then
-        if data_reg_enable = '1' then
+        if (m00_axis_aresetn = '0') then
+            left_axis_data <= (others => '0');
+            right_axis_data <= (others => '0');
+        elsif data_reg_enable = '1' then
             -- Set left data reg 
             left_axis_data <= (others => '0');
             left_axis_data(LR_BIT_INDEX) <= '1';

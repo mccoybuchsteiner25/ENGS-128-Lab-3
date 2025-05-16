@@ -15,7 +15,7 @@ use ieee.std_logic_1164.all;
 entity axis_fifo is
 	generic (
 		DATA_WIDTH	: integer	:= 32;
-		FIFO_DEPTH	: integer	:= 1024
+		FIFO_DEPTH	: integer	:= 128
 	);
 	port (
 	

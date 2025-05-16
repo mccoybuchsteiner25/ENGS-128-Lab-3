@@ -68,7 +68,7 @@ signal axi_data_write : std_logic_vector(C_S00_AXI_DATA_WIDTH-1 downto 0);
 signal data_select : std_logic_vector(C_S00_AXI_ADDR_WIDTH-3 downto 0);
 signal axi_reg : integer := 0;
 
-signal enable_i_s, areset_i_s : std_logic := '0'; 
+signal enable_i_s : std_logic := '0'; 
 signal ch_select_i_s : std_logic_vector(1 downto 0);
 
 -- Input waveform
@@ -370,7 +370,7 @@ port map (
         adc_lrclk_fwd_o     => open,
         dac_lrclk_fwd_o     => open,
         
-       mclk_o              => mclk_s,
+        mclk_o              => mclk_s,
         bclk_o              => bclk_s,
         lrclk_o             => lrclk_s
 );
@@ -388,7 +388,7 @@ port map (
 		enable_i =>  enable_i_s,
 
         --reset 
-        aresetn_i => areset_i_s,
+        aresetn_i => reset_n,
 
         ----------------------------------------------------------------------------
         -- AXI Stream Interface (Receiver/Responder)
@@ -410,20 +410,20 @@ port map (
     -- Ports of Axi Responder Bus Interface S00_AXIS
 		s00_axis_aclk    =>   clk,
 		s00_axis_aresetn  =>  reset_n,
-		s00_axis_tready   => fifo0_s00_axis_tready,
-		s00_axis_tdata	  => fifo0_s00_axis_tdata,
-		s00_axis_tstrb    => fifo0_s00_axis_tstrb,
-		s00_axis_tlast    => fifo0_s00_axis_tlast,
-		s00_axis_tvalid  => fifo0_s00_axis_tvalid,
-
+		s00_axis_tready   => M_AXIS_TREADY,
+		s00_axis_tdata	  => M_AXIS_TDATA,
+		s00_axis_tstrb    => M_AXIS_TSTRB,
+		s00_axis_tlast    => M_AXIS_TLAST,
+		s00_axis_tvalid  => M_AXIS_TVALID,
+	
 		-- Ports of Axi Controller Bus Interface M00_AXIS
 		m00_axis_aclk     => clk,
 		m00_axis_aresetn  => reset_n,
-		m00_axis_tvalid   => M_AXIS_TVALID,
-		m00_axis_tdata    => M_AXIS_TDATA,
-		m00_axis_tstrb    => M_AXIS_TSTRB,
-		m00_axis_tlast    => M_AXIS_TLAST,
-		m00_axis_tready   => M_AXIS_TREADY
+		m00_axis_tvalid   => fifo0_m00_axis_tvalid,
+		m00_axis_tdata    => fifo0_m00_axis_tdata,
+		m00_axis_tstrb    => fifo0_m00_axis_tstrb,
+		m00_axis_tlast    => fifo0_m00_axis_tlast,
+		m00_axis_tready   => fifo0_m00_axis_tready
 );
 
 ----------------------------------------------------------------------------
@@ -432,11 +432,11 @@ fifo1 : axis_fifo
 port map (
         s00_axis_aclk    => clk,
 		s00_axis_aresetn  => reset_n,
-		s00_axis_tready   => fifo0_m00_axis_tready,
-		s00_axis_tdata	  => fifo0_m00_axis_tdata,
-		s00_axis_tstrb    => fifo0_m00_axis_tstrb,
-		s00_axis_tlast    => fifo0_m00_axis_tlast,
-		s00_axis_tvalid  => fifo0_m00_axis_tvalid,
+		s00_axis_tready   => fifo1_s00_axis_tready,
+		s00_axis_tdata	  => fifo1_s00_axis_tdata,
+		s00_axis_tstrb    => fifo1_s00_axis_tstrb,
+		s00_axis_tlast    => fifo1_s00_axis_tlast,
+		s00_axis_tvalid  => fifo1_s00_axis_tvalid,
 
 		-- Ports of Axi Controller Bus Interface M00_AXIS
 		m00_axis_aclk     => clk,
@@ -454,7 +454,7 @@ dut: axis_i2s_wrapper
 port map (
 
     sysclk_i => clk,
-    input_sel_i => '1',
+    input_sel_i => '0',
     ac_mute_en_i => mute_en_sw,
     ac_bclk_o => bclk,
     ac_mclk_o => mclk,
@@ -509,16 +509,16 @@ port map (
 ---------------------------------------------------------------------------- 
  
 -- Hook up transmitter interface to receiver (passthrough test)   
-S_AXIS_TDATA <= M_AXIS_TDATA;
-S_AXIS_TSTRB <= M_AXIS_TSTRB;
-S_AXIS_TLAST <= M_AXIS_TLAST;
-S_AXIS_TVALID <= M_AXIS_TVALID;
-M_AXIS_TREADY <= S_AXIS_TREADY;
+--S_AXIS_TDATA <= M_AXIS_TDATA;
+--S_AXIS_TSTRB <= M_AXIS_TSTRB;
+--S_AXIS_TLAST <= M_AXIS_TLAST;
+--S_AXIS_TVALID <= M_AXIS_TVALID;
+--M_AXIS_TREADY <= S_AXIS_TREADY;
 
 ----------------------------------------------------------------------------   
 -- Processes
 ----------------------------------------------------------------------------   
-M_AXIS_TREADY <= '1';
+--M_AXIS_TREADY <= '1';
 
 -- Generate clock        
 clock_gen_process : process
@@ -533,7 +533,7 @@ begin
 	end loop;
 end process clock_gen_process;
 
-
+reset_n <= S_AXI_ARESETN;
 ----------------------------------------------------------------------------
 -- Initiate process which simulates a master wanting to write.
  -- This process is blocked on a "Send Flag" (enable_send).
@@ -596,9 +596,9 @@ stimulus : PROCESS
     axi_data_write <= (others => '0');
     axi_reg <= 0;           -- we are writing to AXI register 0
     ch_select_i_s <= "00";
-    enable_i_s <= '1';
+    enable_i_s <= '0';
     
-    wait for 15 ns;
+    wait for 55 ns;
     S_AXI_ARESETN <= '1';
     
     
@@ -608,16 +608,16 @@ stimulus : PROCESS
     
     -- write data to register 0
     axi_reg <= 0;
-    axi_data_write <= x"0000000A";
+    axi_data_write <= x"00000078";
     wait for 100 ns;
     master_write_axi_reg(S_AXI_AWADDR, S_AXI_WDATA, S_AXI_WSTRB, enable_send, axi_reg, axi_data_write, S_AXI_BVALID);
     wait for 100 ns;
     
     axi_reg <= 1;
-    axi_data_write <= x"0000000A";
+    axi_data_write <= x"00000078";
     wait for 100 ns;
     master_write_axi_reg(S_AXI_AWADDR, S_AXI_WDATA, S_AXI_WSTRB, enable_send, axi_reg, axi_data_write, S_AXI_BVALID);
-    wait for 100 ns;
+    wait;
         
     std.env.stop;
  END PROCESS stimulus;

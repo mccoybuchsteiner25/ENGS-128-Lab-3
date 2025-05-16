@@ -30,6 +30,8 @@ entity axis_receiver is
 		s00_axis_tvalid   : in std_logic;
 		s00_axis_tready   : out std_logic;
 		
+		left_audio_data_valid_o : out std_logic;
+		right_audio_data_valid_o : out std_logic;
 		-- Data
 		left_audio_data_o     : out std_logic_vector(AC_DATA_WIDTH-1 downto 0);
 		right_audio_data_o    : out std_logic_vector(AC_DATA_WIDTH-1 downto 0));  
@@ -47,7 +49,7 @@ signal axis_tready      : std_logic := '0';
 signal axis_data_0, axis_data_1 : std_logic_vector(AUDIO_DATA_WIDTH-1 downto 0) := (others => '0');
 
 type state_type is (IdleHigh, IdleLow, LatchOutputs, SetRightReady, SetLeftReady);
-signal curr_state, next_state : state_type := IdleHigh;
+signal curr_state, next_state : state_type := IdleLow;
         
 ----------------------------------------------------------------------------
 begin
@@ -55,13 +57,16 @@ begin
 -- Processes
 ----------------------------------------------------------------------------
 
-s00_axis_tready <= axis_tready;
+s00_axis_tready <= axis_tready and s00_axis_aresetn; -- this reset should go in FSM, but holding here for now
 
 -- AXI stream logic
 latch_audio_data : process(s00_axis_aclk)
 begin
     if rising_edge(s00_axis_aclk) then
-        if s00_axis_tvalid = '1' AND axis_tready = '1' then
+       if (s00_axis_aresetn = '0') then
+        axis_data_0 <= (others => '0');
+        axis_data_1 <= (others => '0');
+      elsif s00_axis_tvalid = '1' AND axis_tready = '1' then
             axis_data_0 <= s00_axis_tdata;
             axis_data_1 <= axis_data_0;
         end if;
@@ -74,15 +79,20 @@ end process latch_audio_data;
 latch_audio_outputs : process(s00_axis_aclk)
 begin
     if rising_edge(s00_axis_aclk) then 
+    right_audio_data_valid_o <= '0';
+     left_audio_data_valid_o <= '0';
         if data_reg_enable = '1' then 
             lr_data_bit <= axis_data_1(LR_BIT_INDEX);
-            
+            right_audio_data_valid_o <= '1';
+            left_audio_data_valid_o <= '1';
             if lr_data_bit = '0' then
                 right_audio_data_o <= axis_data_1(AC_DATA_WIDTH-1 downto 0);
                 left_audio_data_o  <= axis_data_0(AC_DATA_WIDTH-1 downto 0);
+                
             elsif lr_data_bit = '1' then
                 right_audio_data_o <= axis_data_0(AC_DATA_WIDTH-1 downto 0);
                 left_audio_data_o  <= axis_data_1(AC_DATA_WIDTH-1 downto 0);
+                
             end if;
         end if;
     end if;
@@ -155,7 +165,7 @@ begin
             
         when SetLeftReady =>  
             axis_tready <= '1';
-        
+            
         when others =>
         
     end case;

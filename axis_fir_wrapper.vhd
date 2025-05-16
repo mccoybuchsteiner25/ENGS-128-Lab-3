@@ -413,36 +413,6 @@ begin
     end case;
 end process;
 
---filter_select : process(ch_select_i)
---begin 
---if (ch_select_i = "00") then
---    left_audio_data_tx_s <= lpf_fir_data_left_s;
---    right_audio_data_tx_s <= lpf_fir_data_right_s;
---    left_audio_data_tx_i_0 <= lpf_fir_left_valid_s;
---    right_audio_data_tx_i_0 <= lpf_fir_right_valid_s;
---elsif (ch_select_i = "01") then
---    left_audio_data_tx_s <= hpf_fir_data_left_s;
---    right_audio_data_tx_s <= hpf_fir_data_right_s;
---    left_audio_data_tx_i_0 <= hpf_fir_left_valid_s;
---    right_audio_data_tx_i_0 <= hpf_fir_right_valid_s;
---elsif (ch_select_i = "10") then
---    left_audio_data_tx_s <= bpf_fir_data_left_s;
---    right_audio_data_tx_s <= bpf_fir_data_right_s;
---    left_audio_data_tx_i_0 <= bpf_fir_left_valid_s;
---    right_audio_data_tx_i_0 <= bpf_fir_right_valid_s;
---elsif (ch_select_i = "11") then
---    left_audio_data_o <= bsf_fir_data_left_s;
---    right_audio_data_tx_s <= bsf_fir_data_right_s;
---    left_audio_data_tx_i_0 <= bsf_fir_left_valid_s;
---    right_audio_data_tx_i_0 <= bsf_fir_right_valid_s;
---else 
---    left_audio_data_tx_s <= lpf_fir_data_left_s;
---    right_audio_data_tx_s <= lpf_fir_data_right_s;
---    left_audio_data_tx_i_0 <= lpf_fir_left_valid_s;
---    right_audio_data_tx_i_0 <= lpf_fir_right_valid_s;
---end if; 
---end process;
-
 clk_proc : process(m_axis_aclk)
 begin
 if rising_edge(m_axis_aclk) then

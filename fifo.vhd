@@ -27,7 +27,7 @@ entity fifo is
         
         -- Read channel
         rd_en_i     : in std_logic;
-        rd_data_o   : out std_logic_vector(DATA_WIDTH-1 downto 0);
+        rd_data_o   : out std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
         
         -- Status flags
         empty_o         : out std_logic;

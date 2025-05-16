@@ -18,11 +18,11 @@ entity axis_i2s_wrapper is
 		-- Parameters of Axi Stream Bus Interface S00_AXIS, M00_AXIS
 		C_S00_AXI_DATA_WIDTH	: integer	:= 32;
 		C_S00_AXI_ADDR_WIDTH	: integer	:= 4;
-		C_S_AXI_DATA_WIDTH	: integer	:= 32;
-		C_S_AXI_ADDR_WIDTH	: integer	:= 4;
+		C_S_AXI_DATA_WIDTH	    : integer	:= 32;
+		C_S_AXI_ADDR_WIDTH	    : integer	:= 4;
 		C_AXI_STREAM_DATA_WIDTH	: integer	:= 32;
-		DDS_DATA_WIDTH : integer := 24;         -- DDS data width
-        DDS_PHASE_DATA_WIDTH : integer := 12;
+		DDS_DATA_WIDTH          : integer   := 24;         -- DDS data width
+        DDS_PHASE_DATA_WIDTH    : integer   := 12;
 		AC_DATA_WIDTH           : integer   := 24);
     Port ( 
         ----------------------------------------------------------------------------
@@ -33,6 +33,9 @@ entity axis_i2s_wrapper is
         -- I2S audio codec ports		
 		-- User controls
 		ac_mute_en_i        : in STD_LOGIC;
+		
+		input_sel_i         : in std_logic;
+		
 		
 		-- Audio Codec I2S controls
         ac_bclk_o           : out STD_LOGIC;
@@ -47,6 +50,10 @@ entity axis_i2s_wrapper is
         ac_adc_data_i       : in STD_LOGIC;
         ac_adc_lrclk_o      : out STD_LOGIC;
         
+        lrclk_o : out std_logic;
+        
+        ----------------------------------------------------------------------------
+
         -- Debug Signals (out)
         dbg_left_audio_rx_o     : out std_logic_vector(AC_DATA_WIDTH-1 downto 0);
         dbg_right_audio_rx_o    : out std_logic_vector(AC_DATA_WIDTH-1 downto 0);
@@ -57,6 +64,10 @@ entity axis_i2s_wrapper is
 		right_dds_phase_inc_dbg_o  : out std_logic_vector(DDS_PHASE_DATA_WIDTH-1 downto 0);
         
         ----------------------------------------------------------------------------
+        
+        -- DDS ports 
+        ----------------------------------------------------------------------------
+        
         --AXI LITE PORTS 
         s00_axi_aclk	: in std_logic;
 		s00_axi_aresetn	: in std_logic;
@@ -80,9 +91,7 @@ entity axis_i2s_wrapper is
 		s00_axi_rvalid	: out std_logic;
 		s00_axi_rready	: in std_logic;
         
-        
-        
-        
+        ----------------------------------------------------------------------------
         
         -- AXI Stream Interface (Receiver/Responder)
     	-- Ports of Axi Responder Bus Interface S00_AXIS
@@ -94,6 +103,8 @@ entity axis_i2s_wrapper is
 		s00_axis_tlast    : in std_logic;
 		s00_axis_tvalid   : in std_logic;
 		
+		----------------------------------------------------------------------------
+
         -- AXI Stream Interface (Tranmitter/Controller)
 		-- Ports of Axi Controller Bus Interface M00_AXIS
 		m00_axis_aclk     : in std_logic;
@@ -118,6 +129,10 @@ signal mclk_s, bclk_s, lrclk_s : std_logic := '0';
 
 signal left_audio_data_rx, right_audio_data_rx : std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0');
 
+signal left_audio_data_dds, right_audio_data_dds : std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0');
+
+signal left_audio_data_s, right_audio_data_s : std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0');
+
 signal left_audio_data_tx, right_audio_data_tx : std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0');
 
 signal ac_mute_n_s, ac_mute_n_reg_s : std_logic := '0';
@@ -129,34 +144,37 @@ signal ac_mute_n_s, ac_mute_n_reg_s : std_logic := '0';
 -- Clock generation
 component i2s_clock_gen is
     Port (
-        sysclk_125MHz_i     : in std_logic;
- --       mclk_i : in std_logic;
+        --sysclk_125MHz_i     : in std_logic; --comment out for block design
+        mclk_i : in std_logic;
         mclk_fwd_o          : out std_logic;
         bclk_fwd_o          : out std_logic;
         adc_lrclk_fwd_o     : out std_logic;
         dac_lrclk_fwd_o     : out std_logic;
         
-        mclk_o              : out std_logic;
+        mclk_o              : out std_logic; --comment out for block design
         bclk_o              : out std_logic;
         lrclk_o             : out std_logic);
 end component;
+
 ---------------------------------------------------------------------------- 
 
 -- I2S receiver
---component i2s_receiver is
---    Generic (AC_DATA_WIDTH : integer := 24);
---    Port (
---        -- Timing
---		mclk_i                : in std_logic;	
---		bclk_i                : in std_logic;	
---		lrclk_i               : in std_logic;
+component i2s_receiver is
+    Generic (AC_DATA_WIDTH : integer := 24);
+    Port (
+        -- Timing
+		mclk_i                : in std_logic;	
+		bclk_i                : in std_logic;	
+		lrclk_i               : in std_logic;
 		
---		-- Data
---		adc_serial_data_i     : in std_logic;
---		left_audio_data_o     : out std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0');
---		right_audio_data_o    : out std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0')
---		);  
---end component;
+		-- Data
+		adc_serial_data_i     : in std_logic;
+		left_audio_data_o     : out std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0');
+		right_audio_data_o    : out std_logic_vector(AC_DATA_WIDTH-1 downto 0) := (others => '0')
+		);  
+end component;
+
+---------------------------------------------------------------------------- 
 
 --DDS 
 component engs128_axi_dds is
@@ -279,6 +297,8 @@ component axis_receiver is
 		s00_axis_tready       : out std_logic;
 		
 		-- Data
+		left_audio_data_valid_o : out std_logic;
+		right_audio_data_valid_o : out std_logic;
 		left_audio_data_o     : out std_logic_vector(AC_DATA_WIDTH-1 downto 0);
 		right_audio_data_o    : out std_logic_vector(AC_DATA_WIDTH-1 downto 0));  
 end component;
@@ -288,38 +308,47 @@ begin
 ----------------------------------------------------------------------------
 -- Component instantiations
 ---------------------------------------------------------------------------- 
-   
+dds_enable_i_s <= '1'; 
+dds_reset_i_s <= '0';
+
+lrclk_o <= lrclk_s;
+
 -- Clock generation
 clock_gen : i2s_clock_gen
     port map (
-        sysclk_125MHz_i     => sysclk_i,
+        --sysclk_125MHz_i     => sysclk_i, --comment out for block design
+        mclk_i              => sysclk_i, --comment out for simulation
         
         mclk_fwd_o          => ac_mclk_o,
         bclk_fwd_o          => ac_bclk_o,
         adc_lrclk_fwd_o     => ac_adc_lrclk_o,
         dac_lrclk_fwd_o     => ac_dac_lrclk_o,
         
-        mclk_o              => mclk_s,
+        --mclk_o              => mclk_s, --comment out for block design
         bclk_o              => bclk_s,
         lrclk_o             => lrclk_s);
 
 
 ---------------------------------------------------------------------------- 
 
--- I2S receiver
---receiver_i2s : i2s_receiver 
---    generic map (AC_DATA_WIDTH => AC_DATA_WIDTH)
---    port map (
 
---        -- Timing
---		mclk_i                => mclk_s, 	
---		bclk_i                => bclk_s,	
---		lrclk_i               => lrclk_s,
+-- I2S receiver
+receiver_i2s : i2s_receiver 
+    generic map (AC_DATA_WIDTH => AC_DATA_WIDTH)
+    port map (
+
+        -- Timing
+ 		mclk_i                => mclk_s, 
+--        mclk_i                  => sysclk_i,	
+		bclk_i                => bclk_s,	
+		lrclk_i               => lrclk_s,
 		
---		-- Data
---		adc_serial_data_i     => ac_adc_data_i,
---		left_audio_data_o     => left_audio_data_rx,
---		right_audio_data_o    => right_audio_data_rx);
+		-- Data
+		adc_serial_data_i     => ac_adc_data_i,
+		left_audio_data_o     => left_audio_data_rx,
+		right_audio_data_o    => right_audio_data_rx);
+
+---------------------------------------------------------------------------- 
 
 dds : engs128_axi_dds
 	port map (
@@ -328,8 +357,8 @@ dds : engs128_axi_dds
 		dds_clk_i  => lrclk_s,  
 		dds_enable_i  => dds_enable_i_s,
 		dds_reset_i   => dds_reset_i_s,
-		left_dds_data_o    => left_audio_data_rx,
-		right_dds_data_o   => right_audio_data_rx,
+		left_dds_data_o    => left_audio_data_dds,
+		right_dds_data_o   => right_audio_data_dds,
 		
 		-- Debug ports to send to ILA
 		left_dds_phase_inc_dbg_o   => left_dds_phase_inc_dbg_o,
@@ -371,7 +400,8 @@ transmitter_i2s : i2s_transmitter
     port map (
 
         -- Timing
-		mclk_i                => mclk_s, 	
+  		mclk_i                => mclk_s, 
+--        mclk_i                  => sysclk_i,	
 		bclk_i                => bclk_s,	
 		lrclk_i               => lrclk_s,
 		
@@ -401,8 +431,8 @@ transmitter_axis : axis_transmitter
 		m00_axis_tvalid       => m00_axis_tvalid,
 		
 		-- Data
-		left_audio_data_i     => left_audio_data_rx,
-		right_audio_data_i    => right_audio_data_rx);
+		left_audio_data_i     => left_audio_data_s,
+		right_audio_data_i    => right_audio_data_s);
     
 ---------------------------------------------------------------------------- 
 
@@ -425,6 +455,8 @@ receiver_axis : axis_receiver
 		s00_axis_tvalid       => s00_axis_tvalid,
 		
 		-- Data
+		left_audio_data_valid_o => open,
+		right_audio_data_valid_o => open,
 		left_audio_data_o     => left_audio_data_tx,
 		right_audio_data_o    => right_audio_data_tx);
 		
@@ -440,6 +472,20 @@ dbg_right_audio_tx_o    <= right_audio_data_tx;
 
 ac_mute_n_s <= not ac_mute_en_i;
 ac_mute_n_o <= ac_mute_n_reg_s;
+
+---------------------------------------------------------------------------- 
+
+select_input : process(input_sel_i, left_audio_data_dds, left_audio_data_rx) 
+begin
+    if (input_sel_i = '0') then
+        left_audio_data_s <= left_audio_data_dds;
+        right_audio_data_s <= right_audio_data_dds;
+    elsif (input_sel_i = '1') then
+        left_audio_data_s <= left_audio_data_rx;
+        right_audio_data_s <= right_audio_data_rx;
+    end if;
+end process;
+
 
 ---------------------------------------------------------------------------- 
 
